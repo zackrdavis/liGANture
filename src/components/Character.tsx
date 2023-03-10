@@ -13,7 +13,7 @@ const CharWrap = styled.div`
 const CharCanvas = styled.canvas`
   width: 100px;
   height: 100px;
-  transform: rotate(90deg);
+  transform: rotate(90deg) scaleY(-1);
 `;
 
 const drawOutputToCanvas = (
@@ -21,6 +21,7 @@ const drawOutputToCanvas = (
   ctx: CanvasRenderingContext2D
 ) => {
   const imgData = ctx.createImageData(28, 28);
+  console.log(nnOutput);
 
   // map the raw outputs from -1 - 1 range to 0 - 255 range
   const asUInt8 = Uint8Array.from(nnOutput.img.data as Float32Array, (val) =>

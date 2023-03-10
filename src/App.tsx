@@ -7,12 +7,12 @@ import {
 } from "react";
 import { Character } from "./components/Character";
 import * as ort from "onnxruntime-web";
-import { imgFromArray, isAlphaNum } from "./utils";
-import { useUpdateEffect } from "./utils";
+import { isAlphaNum } from "./utils";
 import { addresses } from "./components/addresses";
 import styled from "styled-components";
 import * as lerp_array from "lerp-array";
 import { useOnnxSession } from "./useOnnxSession";
+import { Tensor } from "onnxruntime-web";
 
 const AppWrap = styled.div`
   position: fixed;
@@ -65,7 +65,16 @@ function App() {
 
   const handleKey: KeyboardEventHandler = async (e) => {
     if (e.key == "Backspace") {
+      // handle backspace
       setChars(chars.slice(0, -1));
+    } else if (e.key == " ") {
+      setChars([
+        ...chars,
+        {
+          char: [" "],
+          image: { img: new Tensor("float32", Array(784).fill(-1), [1, 784]) },
+        },
+      ]);
     } else if (!keyHeld.current) {
       // handle adding new character, disabled if still holding previous key
       keyHeld.current = true;
@@ -93,9 +102,9 @@ function App() {
     appRef.current?.focus();
   });
 
-  useEffect(() => {
-    console.log(chars);
-  }, [chars]);
+  // useEffect(() => {
+  //   console.log(chars);
+  // }, [chars]);
 
   return (
     <div className="App">
