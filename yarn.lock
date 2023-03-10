@@ -715,6 +715,18 @@ json5@^2.2.2:
   resolved "https://registry.yarnpkg.com/json5/-/json5-2.2.3.tgz#78cd6f1a19bdc12b73db5ad0c61efd66c1e29283"
   integrity sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==
 
+lerp-array@^1.1.1:
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/lerp-array/-/lerp-array-1.1.1.tgz#49ec1794a6db28546fcd4cd61e2192f2ef168c68"
+  integrity sha512-oQtU35G2cAeHNXLFmFXgWINJRNwglf+4gKjRIHVdq9VnDpwxaDaAaCTz2FAkieqkLmRNIySoge6vBjuBLOJIpw==
+  dependencies:
+    lerp "^1.0.0"
+
+lerp@^1.0.0:
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/lerp/-/lerp-1.0.3.tgz#a18c8968f917896de15ccfcc28d55a6b731e776e"
+  integrity sha512-70Rh4rCkJDvwWiTsyZ1HmJGvnyfFah4m6iTux29XmasRiZPDBpT9Cfa4ai73+uLZxnlKruUS62jj2lb11wURiA==
+
 lodash@^4.17.11:
   version "4.17.21"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.21.tgz#679591c564c3bffaae8454cf0b3df370c3d6911c"

@@ -11,6 +11,8 @@ import { imgFromArray, isAlphaNum } from "./utils";
 import { useUpdateEffect } from "./utils";
 import { addresses } from "./components/addresses";
 import styled from "styled-components";
+import * as lerp_array from "lerp-array";
+import { useOnnxSession } from "./useOnnxSession";
 
 const AppWrap = styled.div`
   position: fixed;
@@ -20,50 +22,38 @@ const AppWrap = styled.div`
   height: 100%;
 `;
 
-const StyledLetterForm = styled.span`
-  width: 28px;
-  height: 28px;
-  border: 1px solid black;
-  vertical-align: top;
-  display: inline-block;
-`;
+const addHybridLetter = async (
+  key: string,
+  chars: LetterForm[],
+  setChars: (a: LetterForm[]) => void,
+  requestInference: (
+    address: number[]
+  ) => Promise<ort.InferenceSession.OnnxValueMapType>
+) => {
+  const addressesToCombine = [
+    [...addresses[chars[chars.length - 1].char[0]]],
+    [...addresses[key]],
+  ];
 
-const useOnnxSession = ({ modelPath }: { modelPath: string }) => {
-  // global state:
-  // is model running
-  // [ 'a' 'b' 'c']
-  // [ [....], [...], [....]]
+  console.log(addressesToCombine[0]);
+  console.log(addressesToCombine[1]);
 
-  const [session, setSession] = useState<ort.InferenceSession>();
-  const makingSession = useRef(false);
-  const jobs = useRef<number[][]>([]);
+  for (const step of [
+    0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
+  ]) {
+    const hybridAddress = lerp_array(...addressesToCombine, step);
 
-  // create this session just once for the whole app
-  const makeSession = async () => {
-    makingSession.current = true;
-
-    ort.InferenceSession.create(modelPath, {
-      executionProviders: ["webgl"],
-      graphOptimizationLevel: "all",
-    }).then((sess) => setSession(sess));
-  };
-
-  useEffect(() => {
-    if (!session && !makingSession.current) {
-      makeSession();
-    }
-  }, []);
-
-  const addJob = (address: number[], callback: (img: any) => void) => {
-    jobs.current.push(address);
-  };
-
-  return session;
+    const newLastChar: LetterForm = {
+      char: [...chars[chars.length - 1].char, key],
+      image: await requestInference(hybridAddress),
+    };
+    setChars([...chars.slice(0, -1), newLastChar]);
+  }
 };
 
 type LetterForm = {
   char: string[];
-  image: number[] | "pending";
+  image: ort.InferenceSession.OnnxValueMapType;
 };
 
 function App() {
@@ -71,27 +61,31 @@ function App() {
   const appRef = useRef<HTMLDivElement>(null);
   const [chars, setChars] = useState<LetterForm[]>([]);
 
-  // TODO: Memoize this
-  const handleKey: KeyboardEventHandler = (e) => {
+  const { requestInference } = useOnnxSession("./emnist_vgan.onnx");
+
+  const handleKey: KeyboardEventHandler = async (e) => {
     if (e.key == "Backspace") {
       setChars(chars.slice(0, -1));
     } else if (!keyHeld.current) {
       // handle adding new character, disabled if still holding previous key
       keyHeld.current = true;
+
       if (isAlphaNum(e.key) || e.key == " ") {
-        setChars([...chars, { char: [e.key], image: "pending" }]);
+        setChars([
+          ...chars,
+          {
+            char: [e.key],
+            image: await requestInference(addresses[e.key]),
+          },
+        ]);
       }
     } else if (
-      // hold-to-hybridize, where we add a letter
-      isAlphaNum(e.key) &&
-      isAlphaNum(chars[chars.length - 1].char[0]) &&
-      !chars[chars.length - 1].char.includes(e.key)
+      // a letter key is already held
+      isAlphaNum(e.key) && // new key is a alphanumeric
+      isAlphaNum(chars[chars.length - 1].char[0]) && // previous chars alphanumeric
+      !chars[chars.length - 1].char.includes(e.key) // previous chars doesn't contain the new letter
     ) {
-      const newLastChar: LetterForm = {
-        char: [...chars[chars.length - 1].char, e.key],
-        image: "pending",
-      };
-      setChars([...chars.slice(0, -1), newLastChar]);
+      await addHybridLetter(e.key, chars, setChars, requestInference);
     }
   };
 
@@ -112,11 +106,7 @@ function App() {
         onKeyUp={() => (keyHeld.current = false)}
       >
         {chars.map((c, i) => (
-          <StyledLetterForm key={i}>
-            {c.char.map((l, j) => (
-              <span key={j}>{l}</span>
-            ))}
-          </StyledLetterForm>
+          <Character key={i} chars={c.char} nnOutput={c.image} />
         ))}
       </AppWrap>
     </div>
