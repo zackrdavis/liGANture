@@ -6,9 +6,7 @@ import { addresses } from "./components/addresses";
 import styled from "styled-components";
 import { useOnnxSession } from "./useOnnxSession";
 import { Tensor } from "onnxruntime-web";
-
-//TODO: TYPE THIS
-import { useInterval } from "./components/useInterval";
+import { useInterval } from "./useInterval";
 
 const AppWrap = styled.div`
   position: fixed;
