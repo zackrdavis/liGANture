@@ -1,19 +1,15 @@
-import {
-  KeyboardEventHandler,
-  MouseEventHandler,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { KeyboardEventHandler, useEffect, useRef, useState } from "react";
 import { Character } from "./components/Character";
 import * as ort from "onnxruntime-web";
 import { isAlphaNum } from "./utils";
 import { addresses } from "./components/addresses";
 import styled from "styled-components";
-import * as lerp_array from "lerp-array";
 import { useOnnxSession } from "./useOnnxSession";
 import { Tensor } from "onnxruntime-web";
+
+//TODO: Type THESE
 import { useInterval } from "./components/useInterval";
+import * as lerp_array from "lerp-array";
 
 const AppWrap = styled.div`
   position: fixed;
