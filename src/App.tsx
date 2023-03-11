@@ -13,6 +13,7 @@ import styled from "styled-components";
 import * as lerp_array from "lerp-array";
 import { useOnnxSession } from "./useOnnxSession";
 import { Tensor } from "onnxruntime-web";
+import { useInterval } from "./components/useInterval";
 
 const AppWrap = styled.div`
   position: fixed;
@@ -25,44 +26,133 @@ const AppWrap = styled.div`
 
 type LetterForm = {
   char: string[];
+  currAddr?: number[];
   image: ort.InferenceSession.OnnxValueMapType;
 };
 
 function App() {
-  const [keyHeld, setKeyHeld] = useState(false);
   const appRef = useRef<HTMLDivElement>(null);
   const [chars, setChars] = useState<LetterForm[]>([]);
-  const lastKey = useRef<string>();
+  const [heldKeys, setHeldKeys] = useState<Set<string>>(new Set([]));
+  const destAddress = useRef<number[]>();
+  const didArrive = useRef(false);
 
+  // focus the typing area immediately
+  useEffect(() => appRef.current?.focus());
+
+  // create ONNX session
   const { requestInference } = useOnnxSession("./emnist_vgan.onnx");
 
-  const handleKeyDown: KeyboardEventHandler = async (e) => {
-    const isRepeatedKey = lastKey.current == e.key;
-    lastKey.current = e.key;
+  // setup animation interval for when keys are held
+  useInterval(handleHeldKeys, heldKeys.size ? 100 : null);
 
+  const handleKeyDown: KeyboardEventHandler = async (e) => {
+    // reset didArrive whenever a new key is pressed
+    if (![...heldKeys].includes(e.key)) {
+      didArrive.current = false;
+    }
+
+    // update heldKeys
+    if (isAlphaNum(e.key)) {
+      const newHeldKeys = new Set([...heldKeys]);
+      newHeldKeys.add(e.key);
+      setHeldKeys(newHeldKeys);
+    }
+
+    // handle non-letter keys
     if (e.key == "Backspace") {
       doBackspace(chars, setChars);
     } else if (e.key == " ") {
       doSpace(chars, setChars);
-    } else if (isAlphaNum(e.key)) {
-      if (!keyHeld) {
-        doLetter(e.key, chars, setChars, requestInference);
-      } else {
-        if (isRepeatedKey) {
-          // animate lerp to areas near held letter
-          await doExploreNear(e.key, chars, setChars, requestInference);
-        } else {
-          // animate lerp between the last held letter and the new letter
-          await doHybridLetter(e.key, chars, setChars, requestInference);
-        }
-      }
-      setKeyHeld(true);
+    } else if (isAlphaNum(e.key) && !heldKeys.size) {
+      doLetter(e.key, chars, setChars, requestInference);
     }
+    // TODO: LINEBREAK
+    // TODO: HANDLE SHIFT+KEY
   };
 
-  useEffect(() => {
-    appRef.current?.focus();
-  });
+  const handleKeyUp: KeyboardEventHandler = (e) => {
+    const newHeldKeys = new Set([...heldKeys]);
+    newHeldKeys.delete(e.key);
+    setHeldKeys(newHeldKeys);
+    didArrive.current = false;
+  };
+
+  async function handleHeldKeys() {
+    const heldKeyArr = [...heldKeys];
+    const currAddr = chars[chars.length - 1].currAddr;
+
+    // check if we have arrived at destAddress
+    if (currAddr?.toString() == destAddress?.current?.toString()) {
+      console.log("arrived");
+      didArrive.current = true;
+    }
+
+    if (heldKeyArr.length == 1) {
+      // destAddress corresponds to a single letter
+      destAddress.current = addresses[heldKeyArr[0]];
+    } else {
+      // gather addresses to average
+      const heldAddrs = heldKeyArr.map((key) => addresses[key]);
+
+      // generate mean address
+      let result = [];
+      for (let i = 0; i < heldAddrs[0].length; i++) {
+        let num = 0;
+        for (let j = 0; j < heldAddrs.length; j++) {
+          num += heldAddrs[j][i];
+        }
+        result.push(num / heldAddrs.length);
+      }
+
+      // set mean as destination
+      destAddress.current = result;
+    }
+
+    if (currAddr) {
+      if (!didArrive.current) {
+        // lerp toward the destination address
+        const incr = 0.1;
+        const newAddr = [];
+        for (const [i, curr] of currAddr.entries()) {
+          const dest = destAddress.current[i];
+          const diff = dest - curr;
+
+          if (Math.abs(diff) <= incr) {
+            // if increment would go past dest, go to dest
+            newAddr.push(dest);
+          } else {
+            // otherwise, increment toward dest
+            newAddr.push(curr + Math.sign(diff) * incr);
+          }
+        }
+
+        const newLastChar: LetterForm = {
+          char: heldKeyArr,
+          currAddr: newAddr,
+          image: await requestInference(newAddr),
+        };
+
+        setChars([...chars.slice(0, -1), newLastChar]);
+      } else {
+        // drunkenly explore around current address
+        console.log("explore");
+        const newAddr = [];
+        for (const num of currAddr) {
+          const incr = Math.random() < 0.5 ? -0.05 : 0.05;
+          newAddr.push(num + incr);
+        }
+
+        const newLastChar: LetterForm = {
+          char: heldKeyArr,
+          currAddr: newAddr,
+          image: await requestInference(newAddr),
+        };
+
+        setChars([...chars.slice(0, -1), newLastChar]);
+      }
+    }
+  }
 
   const doExploreNear = async (
     key: string,
@@ -107,6 +197,7 @@ function App() {
       ...chars,
       {
         char: [key],
+        currAddr: addresses[key],
         image: await requestInference(addresses[key]),
       },
     ]);
@@ -147,7 +238,7 @@ function App() {
         ref={appRef}
         tabIndex={0}
         onKeyDown={handleKeyDown}
-        onKeyUp={() => setKeyHeld(false)}
+        onKeyUp={handleKeyUp}
       >
         {chars.map((c, i) => (
           <Character key={i} chars={c.char} nnOutput={c.image} />

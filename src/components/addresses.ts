@@ -1,4 +1,4 @@
-export const addresses = {
+export const addresses: { [key: string]: number[] } = {
   a_old: [
     -6.7697e-1, 2.518e-1, -2.6149, -1.1249, -1.3706e-1, 7.2238e-1, 1.819,
     6.3717e-1, 8.5404e-1, 6.5742e-1, -1.3143, -1.2131, -4.5914e-2, 6.8928e-2,
