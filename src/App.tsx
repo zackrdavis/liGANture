@@ -20,36 +20,8 @@ const AppWrap = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
+  padding: 20px;
 `;
-
-const addHybridLetter = async (
-  key: string,
-  chars: LetterForm[],
-  setChars: (a: LetterForm[]) => void,
-  requestInference: (
-    address: number[]
-  ) => Promise<ort.InferenceSession.OnnxValueMapType>
-) => {
-  const addressesToCombine = [
-    [...addresses[chars[chars.length - 1].char[0]]],
-    [...addresses[key]],
-  ];
-
-  console.log(addressesToCombine[0]);
-  console.log(addressesToCombine[1]);
-
-  for (const step of [
-    0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
-  ]) {
-    const hybridAddress = lerp_array(...addressesToCombine, step);
-
-    const newLastChar: LetterForm = {
-      char: [...chars[chars.length - 1].char, key],
-      image: await requestInference(hybridAddress),
-    };
-    setChars([...chars.slice(0, -1), newLastChar]);
-  }
-};
 
 type LetterForm = {
   char: string[];
@@ -57,44 +29,34 @@ type LetterForm = {
 };
 
 function App() {
-  const keyHeld = useRef(false);
+  const [keyHeld, setKeyHeld] = useState(false);
   const appRef = useRef<HTMLDivElement>(null);
   const [chars, setChars] = useState<LetterForm[]>([]);
+  const lastKey = useRef<string>();
 
   const { requestInference } = useOnnxSession("./emnist_vgan.onnx");
 
-  const handleKey: KeyboardEventHandler = async (e) => {
-    if (e.key == "Backspace") {
-      // handle backspace
-      setChars(chars.slice(0, -1));
-    } else if (e.key == " ") {
-      setChars([
-        ...chars,
-        {
-          char: [" "],
-          image: { img: new Tensor("float32", Array(784).fill(-1), [1, 784]) },
-        },
-      ]);
-    } else if (!keyHeld.current) {
-      // handle adding new character, disabled if still holding previous key
-      keyHeld.current = true;
+  const handleKeyDown: KeyboardEventHandler = async (e) => {
+    const isRepeatedKey = lastKey.current == e.key;
+    lastKey.current = e.key;
 
-      if (isAlphaNum(e.key) || e.key == " ") {
-        setChars([
-          ...chars,
-          {
-            char: [e.key],
-            image: await requestInference(addresses[e.key]),
-          },
-        ]);
+    if (e.key == "Backspace") {
+      doBackspace(chars, setChars);
+    } else if (e.key == " ") {
+      doSpace(chars, setChars);
+    } else if (isAlphaNum(e.key)) {
+      if (!keyHeld) {
+        doLetter(e.key, chars, setChars, requestInference);
+      } else {
+        if (isRepeatedKey) {
+          // animate lerp to areas near held letter
+          await doExploreNear(e.key, chars, setChars, requestInference);
+        } else {
+          // animate lerp between the last held letter and the new letter
+          await doHybridLetter(e.key, chars, setChars, requestInference);
+        }
       }
-    } else if (
-      // a letter key is already held
-      isAlphaNum(e.key) && // new key is a alphanumeric
-      isAlphaNum(chars[chars.length - 1].char[0]) && // previous chars alphanumeric
-      !chars[chars.length - 1].char.includes(e.key) // previous chars doesn't contain the new letter
-    ) {
-      await addHybridLetter(e.key, chars, setChars, requestInference);
+      setKeyHeld(true);
     }
   };
 
@@ -102,17 +64,90 @@ function App() {
     appRef.current?.focus();
   });
 
-  // useEffect(() => {
-  //   console.log(chars);
-  // }, [chars]);
+  const doExploreNear = async (
+    key: string,
+    chars: LetterForm[],
+    setChars: (a: LetterForm[]) => void,
+    requestInference: (
+      address: number[]
+    ) => Promise<ort.InferenceSession.OnnxValueMapType>
+  ) => {
+    console.log("holding same");
+  };
+
+  const doBackspace = (
+    chars: LetterForm[],
+    setChars: (a: LetterForm[]) => void
+  ) => {
+    setChars(chars.slice(0, -1));
+  };
+
+  const doSpace = (
+    chars: LetterForm[],
+    setChars: (a: LetterForm[]) => void
+  ) => {
+    setChars([
+      ...chars,
+      {
+        char: [" "],
+        image: { img: new Tensor("float32", Array(784).fill(-1), [1, 784]) },
+      },
+    ]);
+  };
+
+  const doLetter = async (
+    key: string,
+    chars: LetterForm[],
+    setChars: (a: LetterForm[]) => void,
+    requestInference: (
+      address: number[]
+    ) => Promise<ort.InferenceSession.OnnxValueMapType>
+  ) => {
+    setChars([
+      ...chars,
+      {
+        char: [key],
+        image: await requestInference(addresses[key]),
+      },
+    ]);
+  };
+
+  const doHybridLetter = async (
+    key: string,
+    chars: LetterForm[],
+    setChars: (a: LetterForm[]) => void,
+    requestInference: (
+      address: number[]
+    ) => Promise<ort.InferenceSession.OnnxValueMapType>
+  ) => {
+    console.log("holding multiple");
+
+    const addressesToCombine = [
+      [...addresses[chars[chars.length - 1].char[0]]],
+      [...addresses[key]],
+    ];
+
+    for (const step of [
+      0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
+    ]) {
+      const hybridAddress = lerp_array(...addressesToCombine, step);
+
+      const newLastChar: LetterForm = {
+        char: [...chars[chars.length - 1].char, key],
+        image: await requestInference(hybridAddress),
+      };
+
+      setChars([...chars.slice(0, -1), newLastChar]);
+    }
+  };
 
   return (
     <div className="App">
       <AppWrap
         ref={appRef}
         tabIndex={0}
-        onKeyDown={handleKey}
-        onKeyUp={() => (keyHeld.current = false)}
+        onKeyDown={handleKeyDown}
+        onKeyUp={() => setKeyHeld(false)}
       >
         {chars.map((c, i) => (
           <Character key={i} chars={c.char} nnOutput={c.image} />
