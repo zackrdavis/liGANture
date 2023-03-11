@@ -7,9 +7,8 @@ import styled from "styled-components";
 import { useOnnxSession } from "./useOnnxSession";
 import { Tensor } from "onnxruntime-web";
 
-//TODO: Type THESE
+//TODO: TYPE THIS
 import { useInterval } from "./components/useInterval";
-import * as lerp_array from "lerp-array";
 
 const AppWrap = styled.div`
   position: fixed;
@@ -131,7 +130,7 @@ function App() {
 
         setChars([...chars.slice(0, -1), newLastChar]);
       } else {
-        // drunkenly explore around current address
+        // drunkard's walk around current address
         console.log("explore");
         const newAddr = [];
         for (const num of currAddr) {
@@ -149,17 +148,6 @@ function App() {
       }
     }
   }
-
-  const doExploreNear = async (
-    key: string,
-    chars: LetterForm[],
-    setChars: (a: LetterForm[]) => void,
-    requestInference: (
-      address: number[]
-    ) => Promise<ort.InferenceSession.OnnxValueMapType>
-  ) => {
-    console.log("holding same");
-  };
 
   const doBackspace = (
     chars: LetterForm[],
@@ -197,35 +185,6 @@ function App() {
         image: await requestInference(addresses[key]),
       },
     ]);
-  };
-
-  const doHybridLetter = async (
-    key: string,
-    chars: LetterForm[],
-    setChars: (a: LetterForm[]) => void,
-    requestInference: (
-      address: number[]
-    ) => Promise<ort.InferenceSession.OnnxValueMapType>
-  ) => {
-    console.log("holding multiple");
-
-    const addressesToCombine = [
-      [...addresses[chars[chars.length - 1].char[0]]],
-      [...addresses[key]],
-    ];
-
-    for (const step of [
-      0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
-    ]) {
-      const hybridAddress = lerp_array(...addressesToCombine, step);
-
-      const newLastChar: LetterForm = {
-        char: [...chars[chars.length - 1].char, key],
-        image: await requestInference(hybridAddress),
-      };
-
-      setChars([...chars.slice(0, -1), newLastChar]);
-    }
   };
 
   return (
