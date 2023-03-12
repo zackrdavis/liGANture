@@ -1,6 +1,6 @@
 import * as ort from "onnxruntime-web";
 import { useEffect, useRef } from "react";
-import { RunProps } from "./useOnnxSession";
+import { RunProps } from "use-onnx-web-session";
 
 function clamp(input: number, min: number, max: number): number {
   return input < min ? min : input > max ? max : input;

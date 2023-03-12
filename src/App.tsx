@@ -4,8 +4,8 @@ import { Character } from "./components/Character";
 import { runModel, isAlphaNum } from "./utils";
 import { addresses } from "./components/addresses";
 import styled from "styled-components";
-import { useOnnxSession } from "./useOnnxSession";
 import { useInterval } from "./useInterval";
+import { useOnnxWebSession } from "use-onnx-web-session";
 
 const AppWrap = styled.div`
   position: fixed;
@@ -45,10 +45,7 @@ function App() {
   }, [cursorPos]);
 
   // create ONNX session and get the inference function
-  const requestInference = useOnnxSession("./emnist_vgan.onnx", {
-    executionProviders: ["webgl"],
-    graphOptimizationLevel: "all",
-  });
+  const { requestInference } = useOnnxWebSession("./emnist_vgan.onnx");
 
   // setup animation interval for when keys are held
   useInterval(handleHeldKeys, heldKeys.size ? 10 : null);
@@ -145,6 +142,8 @@ function App() {
           currAddr: newAddr,
           image: await runModel(newAddr, requestInference),
         };
+
+        // { requestInference: ({ feeds, options }: RunProps) => Promise<OnnxValueMapType>; }
 
         setChars([...chars.slice(0, -1), newLastChar]);
       } else {
