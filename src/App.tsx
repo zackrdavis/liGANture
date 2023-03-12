@@ -16,6 +16,13 @@ const AppWrap = styled.div`
   padding: 20px;
 `;
 
+const Cursor = styled.div`
+  width: 3px;
+  height: 100px;
+  background-color: blue;
+  display: inline-block;
+`;
+
 type LetterForm = {
   char: string[];
   currAddr?: number[];
@@ -28,9 +35,14 @@ function App() {
   const [heldKeys, setHeldKeys] = useState<Set<string>>(new Set([]));
   const destAddress = useRef<number[]>();
   const didArrive = useRef(false);
+  const [cursorPos, setCursorPos] = useState(0);
 
   // focus the typing area immediately
   useEffect(() => appRef.current?.focus());
+
+  useEffect(() => {
+    console.log(cursorPos);
+  }, [cursorPos]);
 
   // create ONNX session and get the inference function
   const requestInference = useOnnxSession("./emnist_vgan.onnx", {
@@ -42,6 +54,8 @@ function App() {
   useInterval(handleHeldKeys, heldKeys.size ? 10 : null);
 
   const handleKeyDown: KeyboardEventHandler = async (e) => {
+    console.log(e);
+
     // reset didArrive whenever a new key is pressed
     if (![...heldKeys].includes(e.key)) {
       didArrive.current = false;
@@ -61,6 +75,10 @@ function App() {
       doSpace(chars, setChars);
     } else if (isAlphaNum(e.key) && !heldKeys.size) {
       doLetter(e.key, chars, setChars);
+    } else if (e.key == "ArrowRight") {
+      setCursorPos(Math.min(cursorPos + 1, chars.length));
+    } else if (e.key == "ArrowLeft") {
+      setCursorPos(Math.max(cursorPos - 1, 0));
     }
     // TODO: LINEBREAK
     // TODO: HANDLE SHIFT+KEY
@@ -153,7 +171,8 @@ function App() {
     chars: LetterForm[],
     setChars: (a: LetterForm[]) => void
   ) => {
-    setChars(chars.slice(0, -1));
+    setChars([...chars.slice(0, cursorPos - 1), ...chars.slice(cursorPos)]);
+    setCursorPos(Math.max(cursorPos - 1, 0));
   };
 
   const doSpace = (
@@ -174,6 +193,8 @@ function App() {
     chars: LetterForm[],
     setChars: (a: LetterForm[]) => void
   ) => {
+    console.log("DO LETTER");
+
     setChars([
       ...chars,
       {
@@ -182,6 +203,9 @@ function App() {
         image: await runModel(addresses[key], requestInference),
       },
     ]);
+
+    // advance the cursor
+    setCursorPos(Math.min(cursorPos + 1, chars.length));
   };
 
   return (
@@ -192,8 +216,12 @@ function App() {
         onKeyDown={handleKeyDown}
         onKeyUp={handleKeyUp}
       >
+        {!chars.length || cursorPos == 0 ? <Cursor /> : null}
         {chars.map((c, i) => (
-          <Character key={i} chars={c.char} nnOutput={c.image} />
+          <>
+            <Character key={i} chars={c.char} nnOutput={c.image} />
+            {i == cursorPos - 1 && cursorPos > 0 ? <Cursor /> : null}
+          </>
         ))}
       </AppWrap>
     </div>
