@@ -1,11 +1,10 @@
 import { KeyboardEventHandler, useEffect, useRef, useState } from "react";
+import { InferenceSession, Tensor } from "onnxruntime-web";
 import { Character } from "./components/Character";
-import * as ort from "onnxruntime-web";
-import { isAlphaNum } from "./utils";
+import { runModel, isAlphaNum } from "./utils";
 import { addresses } from "./components/addresses";
 import styled from "styled-components";
 import { useOnnxSession } from "./useOnnxSession";
-import { Tensor } from "onnxruntime-web";
 import { useInterval } from "./useInterval";
 
 const AppWrap = styled.div`
@@ -20,7 +19,7 @@ const AppWrap = styled.div`
 type LetterForm = {
   char: string[];
   currAddr?: number[];
-  image: ort.InferenceSession.OnnxValueMapType;
+  image: InferenceSession.OnnxValueMapType;
 };
 
 function App() {
@@ -33,11 +32,14 @@ function App() {
   // focus the typing area immediately
   useEffect(() => appRef.current?.focus());
 
-  // create ONNX session
-  const { requestInference } = useOnnxSession("./emnist_vgan.onnx");
+  // create ONNX session and get the inference function
+  const requestInference = useOnnxSession("./emnist_vgan.onnx", {
+    executionProviders: ["webgl"],
+    graphOptimizationLevel: "all",
+  });
 
   // setup animation interval for when keys are held
-  useInterval(handleHeldKeys, heldKeys.size ? 100 : null);
+  useInterval(handleHeldKeys, heldKeys.size ? 10 : null);
 
   const handleKeyDown: KeyboardEventHandler = async (e) => {
     // reset didArrive whenever a new key is pressed
@@ -58,7 +60,7 @@ function App() {
     } else if (e.key == " ") {
       doSpace(chars, setChars);
     } else if (isAlphaNum(e.key) && !heldKeys.size) {
-      doLetter(e.key, chars, setChars, requestInference);
+      doLetter(e.key, chars, setChars);
     }
     // TODO: LINEBREAK
     // TODO: HANDLE SHIFT+KEY
@@ -123,7 +125,7 @@ function App() {
         const newLastChar: LetterForm = {
           char: heldKeyArr,
           currAddr: newAddr,
-          image: await requestInference(newAddr),
+          image: await runModel(newAddr, requestInference),
         };
 
         setChars([...chars.slice(0, -1), newLastChar]);
@@ -139,7 +141,7 @@ function App() {
         const newLastChar: LetterForm = {
           char: heldKeyArr,
           currAddr: newAddr,
-          image: await requestInference(newAddr),
+          image: await runModel(newAddr, requestInference),
         };
 
         setChars([...chars.slice(0, -1), newLastChar]);
@@ -170,17 +172,14 @@ function App() {
   const doLetter = async (
     key: string,
     chars: LetterForm[],
-    setChars: (a: LetterForm[]) => void,
-    requestInference: (
-      address: number[]
-    ) => Promise<ort.InferenceSession.OnnxValueMapType>
+    setChars: (a: LetterForm[]) => void
   ) => {
     setChars([
       ...chars,
       {
         char: [key],
         currAddr: addresses[key],
-        image: await requestInference(addresses[key]),
+        image: await runModel(addresses[key], requestInference),
       },
     ]);
   };

@@ -1,5 +1,6 @@
 import * as ort from "onnxruntime-web";
 import { useEffect, useRef } from "react";
+import { RunProps } from "./useOnnxSession";
 
 function clamp(input: number, min: number, max: number): number {
   return input < min ? min : input > max ? max : input;
@@ -16,6 +17,25 @@ export function projectRange(
     ((current - in_min) * (out_max - out_min)) / (in_max - in_min) + out_min;
   return clamp(mapped, out_min, out_max);
 }
+
+/**
+ * @param input An array of 100 numbers between -1 and 1
+ * @param session An existing ONNXRuntime session
+ * @returns A promise that resolves to a map of outputs
+ */
+export const runModel = async (
+  input: number[],
+  requestInference: ({
+    feeds,
+    options,
+  }: RunProps) => Promise<ort.InferenceSession.OnnxValueMapType>
+) => {
+  // shape the address to work with the model
+  const tensor = new ort.Tensor("float32", input, [1, 100]);
+
+  // feed to the model using the labels it requires
+  return await requestInference({ feeds: { z: tensor } });
+};
 
 export const drawOutputToCanvas = (
   nnOutput: ort.InferenceSession.OnnxValueMapType,

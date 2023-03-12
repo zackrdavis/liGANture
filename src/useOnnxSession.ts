@@ -1,22 +1,27 @@
 import { useState, useRef, useEffect } from "react";
-import * as ort from "onnxruntime-web";
+import { InferenceSession } from "onnxruntime-web";
 
-const sleep = (ms: number) => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export type RunProps = {
+  feeds: InferenceSession.OnnxValueMapType;
+  options?: InferenceSession.RunOptions;
 };
 
-export const useOnnxSession = (modelPath: string) => {
-  const [session, setSession] = useState<ort.InferenceSession>();
+/**
+ * @param model Path to .onnx model file
+ * @param options https://onnxruntime.ai/docs/api/js/interfaces/InferenceSession.SessionOptions.html
+ * @returns A function that runs the inference session using the provided input
+ */
+export const useOnnxSession = (
+  model: string,
+  options?: InferenceSession.SessionOptions
+) => {
+  const [session, setSession] = useState<InferenceSession>();
   const makingSession = useRef(false);
 
-  // create this session just once for the whole app
   const makeSession = async () => {
     makingSession.current = true;
-
-    ort.InferenceSession.create(modelPath, {
-      executionProviders: ["webgl"],
-      graphOptimizationLevel: "all",
-    }).then((sess) => setSession(sess));
+    const sess = await InferenceSession.create(model, options);
+    setSession(sess);
   };
 
   useEffect(() => {
@@ -25,13 +30,10 @@ export const useOnnxSession = (modelPath: string) => {
     }
   }, []);
 
-  const requestInference = async (address: number[]) => {
-    await sleep(20);
-    // shape the address to work with the model
-    const tensor = new ort.Tensor("float32", address, [1, 100]);
-    // return a promise
-    return await session!.run({ z: tensor });
+  const requestInference = async ({ feeds, options }: RunProps) => {
+    // TODO: Make sure this can't be called too soon
+    return await session!.run(feeds, options);
   };
 
-  return { requestInference };
+  return requestInference;
 };
